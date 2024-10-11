@@ -1,0 +1,25 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+    {{ block.super }}
+    
+    <h2>Inventory Logs</h2>
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>Item Model</th>
+            <th>Serial Number</th>
+            <th>Action</th>
+            <th>Timestamp</th>
+        </tr>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log.item }}</td>
+            <td>{{ log.item_model }}</td>
+            <td>{{ log.serial_number }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.timestamp }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% endblock %}

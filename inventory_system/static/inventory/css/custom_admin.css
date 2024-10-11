@@ -1,0 +1,14 @@
+/* CSS for custom admin display */
+table.list {
+    width: 100%;  /* Ensure the table takes the full width */
+}
+
+table.list th,
+table.list td {
+    text-align: left;  /* Align text to the left */
+    padding: 10px;  /* Add some padding for better readability */
+}
+
+table.list th {
+    background-color: #f1f1f1;  /* Light grey background for headers */
+}
