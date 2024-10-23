@@ -1,0 +1,412 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+    {{ block.super }}
+
+    <h1>{{ map.name }}</h1>
+
+    <!-- Zoom Controls -->
+    <div>
+        <button id="zoom-in">Zoom In</button>
+        <button id="zoom-out">Zoom Out</button>
+        <button id="select">Select</button> <!-- Select button -->
+        <button id="draw-line">Draw Line</button> <!-- Line drawing button -->
+        <button id="select-line">Select Line</button> <!-- Select Line button -->
+        <label for="line-color">Select Line Color:</label>
+        <input type="color" id="line-color" value="#ff0000"> <!-- Color picker -->
+    </div>
+
+    <!-- Map Container -->
+    <div id="map-container" style="position: relative; width: {{ map.width }}px; height: {{ map.height }}px; border: 1px solid #000; background-color: #f0f0f0;">
+        {% for station in stations %}
+            <div id="station-{{ station.id }}" class="station"
+                style="position: absolute; left: {{ station.latitude }}px; top: {{ station.longitude }}px; cursor: move; padding: 5px; background-color: #008cba; color: white; border-radius: 5px; text-align: center;"
+                data-id="{{ station.id }}">
+                {{ station.name }}
+            </div>
+        {% endfor %}
+
+        {% for line in lines %}
+            <div class="line"
+                style="position: absolute; 
+                        left: {{ line.startX }}px; 
+                        top: {{ line.startY }}px; 
+                        width: {{ line.endX|add:'-'|floatformat:2 }}px; 
+                        height: 10px; 
+                        border: 0px solid {{ line.color }}; 
+                        transform-origin: 0 50%;
+                        transform: rotate({{ line.angle }})deg;">
+            </div>
+        {% endfor %}
+    </div>
+
+    <div id="station-popup" style="display: none; position: absolute; background-color: white; border: 1px solid black; padding: 10px; z-index: 1000;">
+        <span id="popup-close" style="cursor: pointer; font-weight: bold; float: right;">&times;</span>
+        <h3>Station Details</h3>
+        <p><strong>Name:</strong> <span id="station-name"></span></p>
+        <p><strong>Latitude:</strong> <span id="station-latitude"></span></p>
+        <p><strong>Longitude:</strong> <span id="station-longitude"></span></p>
+    </div>
+
+    <script>
+        // Function to calculate the distance (length) between two points
+        function calculateDistance(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+    
+        // Function to calculate the angle between two points
+        function calculateAngle(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            return Math.atan2(dy, dx) * (180 / Math.PI);  // Convert radians to degrees
+        }
+    
+        // Get all lines from the server-side data
+        const lines = {{ lines|safe }};  // Pass the lines data from Django context safely
+        
+        // Check if the map-container exists
+        const mapContainer = document.getElementById('map-container');
+        if (mapContainer) {
+            // Iterate over each line to dynamically render it
+            lines.forEach(line => {
+                const startX = line.startX;
+                const startY = line.startY;
+                const endX = line.endX;
+                const endY = line.endY;
+                const color = line.color;
+    
+                // Create a new div element for the line
+                const lineElement = document.createElement('div');
+                lineElement.classList.add('line');  // Add a CSS class for styling
+                lineElement.style.position = 'absolute';
+                lineElement.style.left = `${startX}px`;
+                lineElement.style.top = `${startY}px`;
+    
+                // Calculate distance and angle between start and end points
+                const distance = calculateDistance(startX, startY, endX, endY);
+                const angle = calculateAngle(startX, startY, endX, endY);
+    
+                // Debugging output for verification
+                console.log('Start:', startX, startY);
+                console.log('End:', endX, endY);
+                console.log('Distance:', distance);
+                console.log('Angle:', angle);
+    
+                // Set line styling and position
+                lineElement.style.width = `${distance}px`;  // Set the width equal to the distance between points
+                lineElement.style.height = '1px';  // Fixed line thickness
+                lineElement.style.backgroundColor = color;  // Use the color from the line data
+                lineElement.style.transformOrigin = '0 50%';  // Rotate the line from its starting point
+                lineElement.style.transform = `rotate(${angle}deg)`;  // Rotate based on the calculated angle
+    
+                // Append the line to the map container
+                mapContainer.appendChild(lineElement);
+            });
+        } else {
+            console.error('Map container not found!');
+        }
+    </script>
+    <script>
+        let zoomLevel = 1;
+        const zoomStep = 0.1;
+        const zoomInButton = document.getElementById('zoom-in');
+        const zoomOutButton = document.getElementById('zoom-out');
+        const drawLineButton = document.getElementById('draw-line');
+        const selectButton = document.getElementById('select');
+        const selectLineButton = document.getElementById('select-line');
+        const lineColorPicker = document.getElementById('line-color');
+    
+        let selectedColor = lineColorPicker.value;
+        let isDrawing = false;
+        let isSelectMode = false;
+        let isLineSelectMode = false;
+        let currentLine = null;
+        let selectedLine = null;
+    
+        // Zoom In Button
+        zoomInButton.addEventListener('click', function() {
+            zoomLevel += zoomStep;
+            updateZoom();
+        });
+    
+        // Zoom Out Button
+        zoomOutButton.addEventListener('click', function() {
+            if (zoomLevel > zoomStep) {
+                zoomLevel -= zoomStep;
+                updateZoom();
+            }
+        });
+    
+        function updateZoom() {
+            mapContainer.style.transform = `scale(${zoomLevel})`;
+            mapContainer.style.transformOrigin = 'top left';
+        }
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+       // Draggable stations
+        document.querySelectorAll('.station').forEach(station => {
+            station.addEventListener('mousedown', handleStationInteraction);
+
+            let isDragging = false;
+            let initialMouseX, initialMouseY;
+            const dragThreshold = 5; // pixels
+
+            function handleStationInteraction(e) {
+                e.preventDefault();
+                const stationElem = e.target;
+                stationElem.style.position = "absolute";
+
+                initialMouseX = e.clientX;
+                initialMouseY = e.clientY;
+                const initialStationLeft = parseInt(stationElem.style.left, 10);
+                const initialStationTop = parseInt(stationElem.style.top, 10);
+
+                function onMouseMove(e) {
+                    const offsetX = (e.clientX - initialMouseX) / zoomLevel;
+                    const offsetY = (e.clientY - initialMouseY) / zoomLevel;
+                    
+                    if (Math.abs(offsetX) > dragThreshold || Math.abs(offsetY) > dragThreshold) {
+                        isDragging = true;
+                    }
+
+                    if (isSelectMode && isDragging) {
+                        stationElem.style.left = `${initialStationLeft + offsetX}px`;
+                        stationElem.style.top = `${initialStationTop + offsetY}px`;
+                    }
+                }
+
+                function onMouseUp(e) {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+
+                    if (!isDragging) {
+                        showPopup(e, stationElem);
+                    } else if (isSelectMode) {
+                        // Update station coordinates via fetch
+                        const newCoordinates = {
+                            x: parseInt(stationElem.style.left, 10),
+                            y: parseInt(stationElem.style.top, 10)
+                        };
+
+                        fetch(`/update-station/${stationElem.dataset.id}/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': '{{ csrf_token }}',
+                            },
+                            body: JSON.stringify(newCoordinates),
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Station updated:', data);
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                        });
+                    }
+
+                    isDragging = false;
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+        });
+
+        // Function to show the station popup (remains the same)
+        function showPopup(e, stationElem) {
+            const stationName = stationElem.innerText;
+            const stationLatitude = stationElem.style.left.replace('px', '');
+            const stationLongitude = stationElem.style.top.replace('px', '');
+
+            // Populate popup with station details
+            document.getElementById('station-name').innerText = stationName;
+            document.getElementById('station-latitude').innerText = stationLatitude;
+            document.getElementById('station-longitude').innerText = stationLongitude;
+
+            // Show and position the popup
+            const popup = document.getElementById('station-popup');
+            popup.style.display = 'block';
+            popup.style.left = `${e.pageX + 10}px`;
+            popup.style.top = `${e.pageY + 10}px`;
+        }
+
+        // Close popup when the close button is clicked (remains the same)
+        document.getElementById('popup-close').addEventListener('click', function() {
+            document.getElementById('station-popup').style.display = 'none';
+        });
+
+        // Hide the popup when clicking outside of it (remains the same)
+        window.addEventListener('click', function(event) {
+            const popup = document.getElementById('station-popup');
+            if (event.target !== popup && !popup.contains(event.target) && !event.target.classList.contains('station')) {
+                popup.style.display = 'none';
+            }
+        });
+
+    
+        // Select Mode Button
+        selectButton.addEventListener('click', function() {
+            toggleButtonState('select');
+            //isSelectMode = !isSelectMode;
+            //selectButton.style.backgroundColor = isSelectMode ? '#00FF00' : '';
+        });
+    
+        // Draw Line Mode Button
+        drawLineButton.addEventListener('click', function() {
+            toggleButtonState('draw-line');
+        });
+    
+        // Select Line Mode Button
+        selectLineButton.addEventListener('click', function() {
+            toggleButtonState('select-line');
+
+        });
+    
+        // Line Color Picker
+        lineColorPicker.addEventListener('input', function() {
+            selectedColor = lineColorPicker.value;
+        });
+        
+
+
+//------------------------------------------------------------------------------------
+
+        function toggleButtonState(excludedButtonId) {
+            // Deselect all buttons first
+            isLineSelectMode = false;
+            isDrawing = false;
+            isSelectMode = false;
+            
+
+            console.log(isLineSelectMode);
+            console.log(isDrawing);
+            console.log(isSelectMode);
+            // Set the button states excluding the one that triggered the toggle
+            if (excludedButtonId == 'select-line') {
+                isLineSelectMode = !isLineSelectMode;
+            }
+            if (excludedButtonId == 'draw-line') {
+                isDrawing = !isDrawing;
+            }
+            if (excludedButtonId == 'select') {
+                isSelectMode = !isSelectMode;
+            }
+        
+            // Update button styling (optional)
+            const selectButton = document.getElementById('select');
+            const drawLineButton = document.getElementById('draw-line');
+            const selectLineButton = document.getElementById('select-line');
+        
+            // Reset all button styles
+            selectButton.style.backgroundColor = '';
+            drawLineButton.style.backgroundColor = '';
+            selectLineButton.style.backgroundColor = '';
+        
+            // Apply active styles based on the toggled states
+            if (isSelectMode) {
+                selectButton.style.backgroundColor = '#00FF00';
+            }
+            if (isDrawing) {
+                drawLineButton.style.backgroundColor = '#00FF00';
+            }
+            if (isLineSelectMode) {
+                selectLineButton.style.backgroundColor = '#00FF00';
+            }
+        }
+        
+
+//-----------------------------------------------------------------------------------------
+
+
+
+
+
+
+        mapContainer.addEventListener('mousedown', function(e) {
+            if (isDrawing && !isLineSelectMode) {
+                // Create a new line element when drawing starts
+                currentLine = document.createElement('div');
+                currentLine.style.position = 'absolute';
+                currentLine.style.border = `1px solid ${selectedColor}`;
+                currentLine.style.pointerEvents = 'none';
+                mapContainer.appendChild(currentLine);
+    
+                // Adjust for zoom level
+                const startX = (e.clientX - mapContainer.getBoundingClientRect().left) / zoomLevel;
+                const startY = (e.clientY - mapContainer.getBoundingClientRect().top) / zoomLevel;
+                currentLine.style.left = `${startX}px`;
+                currentLine.style.top = `${startY}px`;
+    
+                function onMouseMove(e) {
+                    const endX = (e.clientX - mapContainer.getBoundingClientRect().left) / zoomLevel;
+                    const endY = (e.clientY - mapContainer.getBoundingClientRect().top) / zoomLevel;
+    
+                    const deltaX = endX - startX;
+                    const deltaY = endY - startY;
+                    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    
+                    currentLine.style.width = `${length}px`;
+                    currentLine.style.height = '0px';  // No height for the line
+                    currentLine.style.transform = `rotate(${angle}deg)`;
+                    currentLine.style.transformOrigin = '0 50%';
+                }
+    
+                function onMouseUp(e) {
+                    mapContainer.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+    
+                    const lineData = {
+                        startX: startX,
+                        startY: startY,
+                        endX: (e.clientX - mapContainer.getBoundingClientRect().left) / zoomLevel,
+                        endY: (e.clientY - mapContainer.getBoundingClientRect().top) / zoomLevel,
+                        color: selectedColor,
+                    };
+    
+                    fetch('/save-line/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}',
+                        },
+                        body: JSON.stringify(lineData),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Line saved:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                }
+    
+                mapContainer.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+        });
+    </script>
+    
+    
+{% endblock %}

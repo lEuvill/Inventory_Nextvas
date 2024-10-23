@@ -12,3 +12,21 @@ table.list td {
 table.list th {
     background-color: #f1f1f1;  /* Light grey background for headers */
 }
+
+/* Style for (ADMIN) text */
+.admin-highlight {
+    color: red;  /* Make the (ADMIN) text red */
+    font-weight: bold;
+}
+
+
+/* Specific selector for the admin title */
+h2.admin-title .admin-highlight {
+    color: red !important;  /* Force the color to red */
+    font-weight: bold;
+}
+.line {
+    position: absolute;
+    background-color: red; /* Default color, overridden by JavaScript */
+    height: 2px; /* Line thickness */
+}

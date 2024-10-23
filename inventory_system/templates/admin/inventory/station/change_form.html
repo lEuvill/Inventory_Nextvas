@@ -1,0 +1,16 @@
+<!-- admin/inventory/station/change_form.html -->
+
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+    <h1>{{ station.name }} - Change</h1>
+
+    <div id="map-container" style="width: {{ map.width }}px; height: {{ map.height }}px; border: 1px solid #000; background-color: #f0f0f0;">
+        {% for station in stations %}
+            <div id="station-{{ station.id }}" class="station"
+                 style="left: {{ station.latitude }}px; top: {{ station.longitude }}px;">
+                {{ station.name }}
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

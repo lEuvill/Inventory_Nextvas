@@ -1,8 +1,10 @@
 from django.contrib import admin
+from .forms import StationForm
+from django.http import HttpResponseRedirect
 from django.urls import path
 from django.shortcuts import render
-from .models import Map, Station, InventoryItem, InventoryLog  # Import your models
-from django.utils.html import format_html, mark_safe
+from .models import Station, Line, InventoryItem, InventoryLog, StationLog  # Import your models
+from django.utils.html import format_html
 
 class InventoryItemAdmin(admin.ModelAdmin):
     search_fields = ['name', 'Item_Model', 'Serial_Number']
@@ -86,32 +88,84 @@ class InventoryItemAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         # Fetch the latest 50 logs for display in the inventory item admin
         logs = InventoryLog.objects.all().order_by('-timestamp')[:50]
-        extra_context = {'logs': logs}  # Add logs to the context
+
+        # Add the logs and custom label to the extra_context
+        extra_context = extra_context or {}
+        extra_context['logs'] = logs  # Add logs to the context
+        extra_context['custom_logs_label'] = "(ADMIN)"  # Set custom label for the logs section
+        
         return super().changelist_view(request, extra_context=extra_context)
 
 class InventoryLogAdmin(admin.ModelAdmin):
     list_display = ('item', 'item_model', 'serial_number', 'action', 'timestamp')
+    
+from django.contrib import admin
+from .models import Station  # Make sure to import the Station model
+
+
+
+
+
+
+
+
+from django.contrib import admin
+from .models import Station
+from .forms import StationForm
+
+
 class StationAdmin(admin.ModelAdmin):
-    # Any existing code for the Station admin view
-    pass
+    form = StationForm  # Use the custom form
+    
+    list_display = ('name', 'latitude', 'longitude', 'display_items')
+    search_fields = ('name',)
+    filter_horizontal = ('items',)
 
+    def display_items(self, obj):
+        return ", ".join([item.name for item in obj.items.all()]) if obj.items.exists() else "No items"
+    
+    display_items.short_description = 'Attached Items'
+
+    # Add the custom template for map integration
+    change_list_template = "admin/inventory/station/change_list_with_map.html"  # For the list view
+    change_form_template = "admin/inventory/station/change_form.html"
+    
+    def changelist_view(self, request, extra_context=None):
+        # Pass your custom map context
+        extra_context = extra_context or {}
+        
+        # Define map dimensions and name (you can customize these)
+        extra_context['map'] = {
+            'name': 'Station Map',
+            'width': 2000,  # width of the map in pixels
+            'height': 1000,  # height of the map in pixels
+        }
+
+        # Pass all stations to the context
+        extra_context['stations'] = Station.objects.all()
+
+        # Pass all lines to the context
+        #extra_context['lines'] = Line.objects.all()  # Assuming you have a Line model that stores the drawn lines
+        extra_context['lines'] = list(Line.objects.all().values('startX', 'startY', 'endX', 'endY', 'color'))
+        #extra_context['lines'] = Line.objects.all().values('startX', 'startY', 'endX', 'endY', 'color')
+        return super().changelist_view(request, extra_context=extra_context)
+
+   
+#class LineAdmin(admin.ModelAdmin):
+  #  list_display = ('start_x', 'start_y', 'end_x', 'end_y', 'color', 'map')
 class MapAdmin(admin.ModelAdmin):
-    change_list_template = "inventory/map_view.html"  # Your custom template
+    change_list_template = "admin/map_changelist.html"
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('<int:object_id>/', self.admin_site.admin_view(self.map_view), name='map_view'),
-        ]
-        return custom_urls + urls
+    def changelist_view(self, request, extra_context=None):
+        # Redirects to the map view
+        return HttpResponseRedirect('/admin/map/')
 
-    def map_view(self, request, object_id):
-        map_instance = get_object_or_404(Map, id=object_id)
-        stations = Station.objects.filter(map=map_instance)
-        return render(request, "inventory/map_view.html", {'map': map_instance, 'stations': stations})
+
+
 
 # Register your models
 admin.site.register(Station, StationAdmin)  # Register Station
-admin.site.register(Map, MapAdmin)  # Register Map with the custom view
 admin.site.register(InventoryItem, InventoryItemAdmin)  # Register InventoryItem with custom admin
 admin.site.register(InventoryLog, InventoryLogAdmin)
+admin.site.register(StationLog)
+admin.site.register(Line)

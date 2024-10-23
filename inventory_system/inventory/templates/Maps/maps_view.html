@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ map.name }}</title>
+    <style>
+        #map-container {
+            position: relative;
+            width: {{ map.width }}px;
+            height: {{ map.height }}px;
+            border: 1px solid #000;
+            background-color: #f0f0f0;
+        }
+        .station {
+            position: absolute;
+            cursor: move;
+            padding: 5px;
+            background-color: #008cba;
+            color: white;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<h1>{{ map.name }}</h1>
+<div id="map-container">
+    {% for station in stations %}
+        <div id="station-{{ station.id }}" class="station"
+             style="left: {{ station.latitude }}px; top: {{ station.longitude }}px;"
+             data-id="{{ station.id }}">
+            {{ station.name }}
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+    document.querySelectorAll('.station').forEach(station => {
+        station.addEventListener('mousedown', startDrag);
+
+        function startDrag(e) {
+            e.preventDefault();
+    
+            const stationElem = e.target;
+            const rect = stationElem.getBoundingClientRect();
+    
+            // Calculate the mouse position relative to the station's top-left corner
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+    
+            function onMouseMove(e) {
+                // Set the new coordinates, adjusting for the relative position
+                stationElem.style.left = `${e.clientX - offsetX}px`;
+                stationElem.style.top = `${e.clientY - offsetY}px`;
+            }
+    
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+    
+                // Send the new coordinates to the server
+                const newCoordinates = {
+                    x: parseInt(stationElem.style.left, 10),
+                    y: parseInt(stationElem.style.top, 10)
+                };
+                console.log(`New coordinates for station ${stationElem.dataset.id}:`, newCoordinates);
+    
+                fetch(`/update-station/${stationElem.dataset.id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token for security
+                    },
+                    body: JSON.stringify(newCoordinates),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Station updated:', data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+    
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+    });
+</script>
+
+</body>
+</html>

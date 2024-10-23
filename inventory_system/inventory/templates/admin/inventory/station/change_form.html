@@ -1,0 +1,26 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_related_objects %}
+    <h2>Station Location</h2>
+    <div id="map" style="height: 400px;"></div>
+
+    <script>
+        // Initialize the map using station coordinates (original.longitude and original.latitude)
+        var map = L.map('map').setView([{{ original.latitude }}, {{ original.longitude }}], 13);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add a marker for the station's location
+        var marker = L.marker([{{ original.latitude }}, {{ original.longitude }}]).addTo(map);
+        marker.bindPopup("{{ original.name }}").openPopup();
+    </script>
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+    <!-- This ensures that the available items and other form data are rendered properly -->
+{% endblock %}

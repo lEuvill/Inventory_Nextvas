@@ -1,0 +1,27 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Map of Call Center Stations</h1>
+
+<div id="map" style="height: 500px; width: 100%;"></div>
+
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script>
+    // Initialize the map
+    var map = L.map('map').setView([51.505, -0.09], 13); // Adjust default view
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+    }).addTo(map);
+
+    // Add stations from the context (you can render stations in JavaScript here or pass them via context)
+    var stations = {{ stations|safe }};
+    stations.forEach(station => {
+        var marker = L.marker([station.longitude, station.latitude]).addTo(map);
+        marker.bindPopup(`Station: ${station.name}`);
+    });
+</script>
+
+{% endblock %}
